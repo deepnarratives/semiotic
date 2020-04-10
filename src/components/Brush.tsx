@@ -50,11 +50,11 @@ class Brush extends React.Component<BrushProps, null> {
       (lastProps.extent &&
         extent &&
         flatShortArray(lastProps.extent) !==
-          flatShortArray(extent)) ||
+        flatShortArray(extent)) ||
       ((lastProps.selectedExtent &&
         selectedExtent &&
         flatShortArray(lastProps.selectedExtent) !==
-          flatShortArray(selectedExtent)) ||
+        flatShortArray(selectedExtent)) ||
         (!lastProps.selectedExtent && selectedExtent) ||
         (lastProps.selectedExtent && !selectedExtent))
     ) {
@@ -86,11 +86,13 @@ class Brush extends React.Component<BrushProps, null> {
   render() {
     const { position = [0, 0] } = this.props
     return (
-      <g
-        transform={`translate(${position})`}
-        ref={node => (this.node = node)}
-        className="xybrush"
-      />
+      <>
+        <g
+          transform={`translate(${position})`}
+          ref={node => (this.node = node)}
+          className="xybrush"
+        />
+      </>
     )
   }
 }

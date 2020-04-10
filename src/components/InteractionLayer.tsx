@@ -4,6 +4,7 @@ import { select, event } from "d3-selection"
 
 // components
 import Brush from "./Brush"
+import { Brush as VXBrush } from "@vx/brush"
 
 import { HOCSpanOrDiv } from "./SpanOrDiv"
 
@@ -11,6 +12,8 @@ import { Interactivity, InteractionLayerProps, BaseColumnType, InteractionLayerS
 
 import { brushing, brushEnd, brushStart, calculateOverlay } from "./processing/InteractionItems"
 import InteractionCanvas from "./interactionLayerBehavior/InteractionCanvas";
+
+import { scaleLinear } from "d3-scale"
 
 const generateOMappingFn = projectedColumns => (d): null | any => {
   if (d) {
@@ -134,18 +137,18 @@ class InteractionLayer extends React.PureComponent<InteractionLayerProps, Intera
 
     if (actualBrush === "xBrush") {
       const castExtent = extent as number[]
-      mappingFn = (d): null | Array<number> =>
-        !d ? null : [xScale.invert(d[0]), xScale.invert(d[1])]
+      mappingFn = (d): null | object =>
+        !d ? null : [d.x0, d.x1]
       semioticBrush = brushX()
       selectedExtent = castExtent.map(d => xScale(d)) as number[]
       endMappingFn = mappingFn
     } else if (actualBrush === "yBrush") {
       const castExtent = extent as number[]
 
-      mappingFn = (d): null | Array<number> =>
+      mappingFn = (d): null | object =>
         !d
           ? null
-          : [yScale.invert(d[0]), yScale.invert(d[1])].sort((a, b) => a - b)
+          : [d.y0, d.y1].sort((a, b) => a - b)
       semioticBrush = brushY()
       selectedExtent = castExtent.map(d => yScale(d)).sort((a, b) => a - b)
       endMappingFn = mappingFn
@@ -160,15 +163,15 @@ class InteractionLayer extends React.PureComponent<InteractionLayerProps, Intera
       }
 
       semioticBrush = brush()
-      mappingFn = (d): null | Array<Array<number>> => {
+      mappingFn = (d): null | object => {
         if (!d) return null
-        const yValues = [yScale.invert(d[0][1]), yScale.invert(d[1][1])].sort(
+        const yValues = [d.y0, d.y1].sort(
           (a, b) => a - b
         )
 
         return [
-          [xScale.invert(d[0][0]), yValues[0]],
-          [xScale.invert(d[1][0]), yValues[1]]
+          [d.x0, yValues[0]],
+          [d.x1, yValues[1]]
         ]
       }
 
@@ -213,14 +216,36 @@ class InteractionLayer extends React.PureComponent<InteractionLayerProps, Intera
         brushEnd(endMappingFn(event.selection), undefined, brushData, undefined, interaction)
       })
 
-    return (
-      <g className="brush">
+    const resizeTriggerAreas = actualBrush === "xyBrush" ? ['left', 'right', 'top', 'bottom', 'bottomRight', 'bottomLeft', 'topRight', 'topLeft'] : actualBrush === "yBrush" ? ["top", "botom"] : ["left", "right"]
+    const brushDirection = actualBrush === "xyBrush" ? "both" : actualBrush === "xBrush" ? "horizontal" : "vertical"
+
+
+    return (<>
+      <VXBrush
+        width={xScale.range()[1]}
+        height={yScale.range()[0]}
+        handleSize={10}
+        xScale={xScale}
+        yScale={yScale}
+        margin={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        resizeTriggerAreas={resizeTriggerAreas}
+        brushDirection={brushDirection}
+        onBrushStart={e => brushStart(mappingFn(e), undefined, brushData, undefined, interaction)}
+        onBrushEnd={e => brushEnd(mappingFn(e), undefined, brushData, undefined, interaction)}
+        onChange={e => brushing(mappingFn(e), undefined, brushData, undefined, interaction)}
+        selectedBoxStyle={{
+          fill: 'black',
+          stroke: 'blue',
+        }}
+      />
+      {/*<g className="brush">
         <Brush
           selectedExtent={selectedExtent}
           extent={extent}
           svgBrush={semioticBrush}
         />
-      </g>
+      </g>*/}
+    </>
     )
   }
 
@@ -289,15 +314,16 @@ class InteractionLayer extends React.PureComponent<InteractionLayerProps, Intera
       .range(rScale.domain().reverse())
 
     if (projection && projection === "horizontal") {
-      mappingFn = (d): null | Array<number> =>
-        !d ? null : [rScale.invert(d[0]), rScale.invert(d[1])]
+      mappingFn = (d): null | object => {
+        return !d ? null : [d.x0, d.x1]
+      }
     } else
-      mappingFn = (d): null | Array<number> => {
+      mappingFn = (d): null | object => {
         return !d
           ? null
           : [
-            rScaleReverse(rScale.invert(d[1])),
-            rScaleReverse(rScale.invert(d[0]))
+            rScaleReverse(d.y1),
+            rScaleReverse(d.y0)
           ]
       }
 
@@ -306,52 +332,71 @@ class InteractionLayer extends React.PureComponent<InteractionLayerProps, Intera
     const columnHash = oColumns
     let brushPosition, selectedExtent
     const brushes: Array<React.ReactNode> = Object.keys(columnHash).map(c => {
+      const currentColumn = columnHash[c]
       if (projection && projection === "horizontal") {
         selectedExtent = interaction.extent[c]
           ? interaction.extent[c].map(d => rScale(d))
           : interaction.startEmpty ? null : rRange
 
-        brushPosition = [0, columnHash[c].x]
+        brushPosition = [0, currentColumn.x]
         semioticBrush = brushX()
         semioticBrush
-          .extent([[rRange[0], 0], [rRange[1], columnHash[c].width]])
+          .extent([[rRange[0], 0], [rRange[1], currentColumn.width]])
           .on("start", () => {
-            brushStart(mappingFn(event.selection), c, brushData, columnHash[c], interaction)
+            brushStart(mappingFn(event.selection), c, brushData, currentColumn, interaction)
           })
           .on("brush", () => {
-            brushing(mappingFn(event.selection), c, brushData, columnHash[c], interaction)
+            brushing(mappingFn(event.selection), c, brushData, currentColumn, interaction)
           })
           .on("end", () => {
-            brushEnd(mappingFn(event.selection), c, brushData, columnHash[c], interaction)
+            brushEnd(mappingFn(event.selection), c, brushData, currentColumn, interaction)
           })
       } else {
         selectedExtent = interaction.extent[c]
           ? interaction.extent[c].map(d => rRange[1] - rScale(d)).reverse()
           : interaction.startEmpty ? null : rRange
-        brushPosition = [columnHash[c].x, 0]
+        brushPosition = [currentColumn.x, 0]
         semioticBrush = brushY()
         semioticBrush
-          .extent([[0, rRange[0]], [columnHash[c].width, rRange[1]]])
+          .extent([[0, rRange[0]], [currentColumn.width, rRange[1]]])
           .on("start", () => {
-            brushStart(mappingFn(event.selection), c, brushData, columnHash[c], interaction)
+            brushStart(mappingFn(event.selection), c, brushData, currentColumn, interaction)
           })
           .on("brush", () => {
-            brushing(mappingFn(event.selection), c, brushData, columnHash[c], interaction)
+            brushing(mappingFn(event.selection), c, brushData, currentColumn, interaction)
           })
           .on("end", () => {
-            brushEnd(mappingFn(event.selection), c, brushData, columnHash[c], interaction)
+            brushEnd(mappingFn(event.selection), c, brushData, currentColumn, interaction)
           })
       }
 
+      const columnWidth = currentColumn.width
+
+      const columnScale = scaleLinear().domain([0, columnWidth]).range([0, columnWidth])
+
+      const xScaleForBrush = projection === "horizontal" ? rScale : columnScale
+      const yScaleForBrush = projection === "horizontal" ? columnScale : rScale
+      const brushDirection = projection === "horizontal" ? "horizontal" : "vertical"
+      const resizeTriggerAreas = projection === "horizontal" ? ['left', 'right', 'bottomRight'] : ["top", "botom"]
+
       return (
-        <g key={`column-brush-${c}`} className="brush">
-          <Brush
-            key={`orbrush${c}`}
-            selectedExtent={selectedExtent}
-            svgBrush={semioticBrush}
-            position={brushPosition}
-          />
-        </g>
+        <VXBrush
+          width={xScaleForBrush.range()[1]}
+          height={yScaleForBrush.range()[1]}
+          handleSize={10}
+          xScale={xScaleForBrush}
+          yScale={yScaleForBrush}
+          margin={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          resizeTriggerAreas={resizeTriggerAreas}
+          brushDirection={brushDirection}
+          onBrushStart={e => brushStart(mappingFn(e), c, brushData, currentColumn, interaction)}
+          onBrushEnd={e => brushEnd(mappingFn(e), c, brushData, currentColumn, interaction)}
+          onChange={e => brushing(mappingFn(e), c, brushData, currentColumn, interaction)}
+          selectedBoxStyle={{
+            fill: 'black',
+            stroke: 'blue',
+          }}
+        />
       )
     })
     return brushes

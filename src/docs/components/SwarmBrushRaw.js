@@ -1,36 +1,34 @@
 import * as React from "react"
 import { OrdinalFrame } from "../../components"
 import ProcessViz from "./ProcessViz"
-/*
 
-*/
+const data = Array.from(Array(200), () => ({
+  value: parseInt(Math.random() * 100, 10)
+}))
 
-const settings = {
-  size: [200, 700],
-  rAccessor: d => d.value,
+const orFrameSettings = {
+  size: [700, 200],
+  rAccessor: "value",
   oAccessor: () => "singleColumn",
-  style: () => ({ fill: "#007190", stroke: "white", strokeWidth: 1 }),
+  style: { fill: "steelblue", stroke: "white", strokeWidth: 1 },
   type: "swarm",
   summaryType: "violin",
-  summaryStyle: () => ({
-    fill: "#007190",
+  summaryStyle: {
+    fill: "steelblue",
+    fillOpacity: 0.3,
     stroke: "white",
     strokeWidth: 1
-  }),
-  projection: "vertical",
-  axes: [
-    { orient: "left" },
-    { orient: "right", marginalSummaryType: "violin", showPoints: true }
-  ],
+  },
+  projection: "horizontal",
+  axes: [{ orient: "bottom" }],
   rExtent: [0, 100],
-  margin: { left: 20, top: 0, bottom: 100, right: 50 },
-  oPadding: 0
+  margin: { left: 20, top: 0, bottom: 50, right: 20 },
+  data
 }
 
 export default (data, event, resetExtent) => {
   const swarmBrushChart = {
-    ...settings,
-    data: data,
+    ...orFrameSettings,
     interaction: {
       columnsBrush: true,
       extent: { singleColumn: resetExtent },
@@ -41,6 +39,7 @@ export default (data, event, resetExtent) => {
   return (
     <div>
       <ProcessViz frameSettings={swarmBrushChart} frameType="OrdinalFrame" />
+      <OrdinalFrame {...swarmBrushChart} projection="vertical" size={[200, 500]} axes={[{ orient: "right" }]} margin={{ right: 50, top: 10, botom: 30 }} />
       <OrdinalFrame {...swarmBrushChart} />
     </div>
   )
